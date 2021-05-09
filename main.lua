@@ -16,7 +16,7 @@
 
 
 local utils = require('mp.utils')
-
+local search = require('search')
 
 local settings = {
     -- essentially infinity
@@ -56,7 +56,6 @@ local pl = {
     active = false,
     -- in search mode - see settings
     search_mode = settings.search_mode_off,
-    search_input_string = ""
 
 }
 -- sync member variables to the values of their mirrored properties
@@ -164,7 +163,7 @@ end
 -- note - the playlist array is 0-based, but lua arrays are usually 1-based
 -- so my display arrays are 1-based
 
--- both return lists
+-- return list of strings
 function _short_list_display_lines(playlist)
     local display_files = {}
     for i = 0, #playlist do
@@ -180,7 +179,7 @@ function _short_list_display_lines(playlist)
 end
 
 -- handles circular buffer display
--- returns multiline string
+-- returns returns list of strings
 function _long_list_display_lines(playlist)
     local display_files = {}
     local first = pl.cursor - settings.num_lines / 2
@@ -333,7 +332,7 @@ function add_keybindings()
     mp.add_forced_key_binding('BS', 'remove_file', remove_file)
 
     mp.add_forced_key_binding('ESC', 'handle_exit_key', handle_exit_key)
-    mp.add_forced_key_binding('/', 'enter_search_input_mode', enter_search_input_mode)
+    mp.add_forced_key_binding('/', 'enter_search_input_mode', search.enter_input_mode)
 end
 
 function remove_keybindings()
@@ -353,71 +352,6 @@ mp.add_key_binding('SHIFT+ENTER', 'show_playlist', show_playlist)
 ----------------------------- SEARCH --------------------------------
 ---------------------------------------------------------------------
 
--- first mode of search
--- input search term
-function enter_search_input_mode()
-    if pl.search_mode == settings.search_mode_input then
-        return
-    end
-    pl.search_mode = settings.search_mode_input
-    add_search_keybindings()
-    remove_search_keybindings()
-end
-
-function show_search_input(duration)
-    pl.update()
-    if pl.len == 0 then
-        return
-    end
-    input_line = "Search: "..pl.search_input_string
-    mp.osd_message(output, (tonumber(duration) or settings.osd_duration_seconds))
-end
-
-function handle_search_enter()
-
-end
-
-function handle_search_escape()
-
-end
-
-function handle_backspace()
-
-end
-
-function handle_input(char)
-
-end
-
-local SEARCH_BINDINGS = {}
-
-function add_search_keybindings()
-    local bindings = {
-        {'BS', handle_backspace},
-        {'ENTER', handle_search_enter},
-        {'ESC', handle_search_escape},
-        {'SPACE', function() handle_input(' ') end}
-    }
-    local input_chars = "abcdefghijklmnopqrstuvwxyz-_."
-    for ch in input_chars:gmatch"." do
-        bindings[#bindings + 1] = {ch, function() handle_input(ch) end}
-    end
-    for i, binding in ipairs(bindings) do
-        local key = binding[1]
-        local func = binding[2]
-        local name = '__search_binding_' .. i
-        SEARCH_BINDINGS[#SEARCH_BINDINGS + 1] = name
-        mp.add_forced_key_binding(key, name, func, "repeatable")
-        print("Added binding: "..name)
-    end
-end
-
-function remove_search_keybindings()
-    for i, key_name in ipairs(SEARCH_BINDINGS) do
-        mp.remove_key_binding(key_name)
-        print("removed binding: "..key_name)
-    end
-end
 
 -- leaving here as an implementation example of hooks
 
