@@ -15,19 +15,13 @@
 -- search playlist scrolls like regular playlist
 
 
-local utils = require('mp.utils')
+--local utils = require('mp.utils')
 local search = require('search')
+local pl = require('playlist')
 
 local settings = {
     -- essentially infinity
     osd_duration_seconds = 600,
-
-    -- number of lines displayed
-    num_lines = 10,
-
-    -- display line prefixes
-    playing_str = "->",
-    cursor_str = ">",
 
     --- in search mode you can be in one of two states
     ---    inputting a search string
@@ -36,48 +30,13 @@ local settings = {
     search_mode_list = 1,
     search_mode_off = 0
 }
+
 function settings.print()
     print("Settings:")
     for k,v in pairs(settings) do
         print(k, "=>", v)
     end
 end
-
-
--- playlist context
-local pl = {
-    -- index in playlist of currently playing video
-    pos = 0,
-    -- playlist length
-    len = 0,
-    -- cursor iterates through playlist - bidirectional
-    cursor = 0,
-    -- active manager - ie don't reset cursor
-    active = false,
-    -- in search mode - see settings
-    search_mode = settings.search_mode_off,
-
-}
--- sync member variables to the values of their mirrored properties
-function pl.update()
-    pl.pos = mp.get_property_number('playlist-pos', 0)
-    pl.len = mp.get_property_number('playlist-count', 0)
-end
--- increment cursor
-function pl.increment()
-    pl.cursor = (pl.cursor + 1) % pl.len
-end
--- decrement cursor
-function pl.decrement()
-    pl.cursor = pl.cursor - 1
-    if pl.cursor == -1 then
-        pl.cursor = pl.len - 1
-    end
-end
-function pl.print()
-    print("playlist context: pos="..pl.pos..", len="..pl.len..", cursor="..pl.cursor)
-end
-
 
 -- properties manager
 -- hold custom properties - save defaults
@@ -148,93 +107,11 @@ end
 --print_osd_properties()
 
 
-function get_playlist()
-    local playlist = {}
-    for i=0, pl.len-1, 1
-    do
-        local l_path, l_file = utils.split_path(mp.get_property('playlist/'..i..'/filename'))
-        playlist[i] = l_file
-    end
-    return playlist
-end
-
-
--- functions to prepare output
--- note - the playlist array is 0-based, but lua arrays are usually 1-based
--- so my display arrays are 1-based
-
--- return list of strings
-function _short_list_display_lines(playlist)
-    local display_files = {}
-    for i = 0, #playlist do
-        display_files[i+1] = playlist[i]
-        if i == pl.pos then
-            display_files[i+1] = settings.playing_str..display_files[i+1]
-        end
-        if i == pl.cursor then
-            display_files[i+1] = settings.cursor_str..display_files[i+1]
-        end
-    end
-    return display_files
-end
-
--- handles circular buffer display
--- returns returns list of strings
-function _long_list_display_lines(playlist)
-    local display_files = {}
-    local first = pl.cursor - settings.num_lines / 2
-    if settings.num_lines % 2 == 0 then
-        first = first + 1
-    end
---        print("first="..first..", first + settings.num_lines="..(first + settings.num_lines))
-    local index = 0
-    for i = first, first + settings.num_lines - 1 do
-        if i < 0 then
-            index = #playlist + 1 + i
-        elseif i > #playlist then
-            index = i - (#playlist + 1)
-        else
-            index = i
-        end
-        display_files[#display_files+1] = playlist[index]
-        if index == pl.pos then
-            display_files[#display_files] = settings.playing_str..display_files[#display_files]
-        end
-        if index == pl.cursor then
-            display_files[#display_files] = settings.cursor_str..display_files[#display_files]
-        end
---            print("i="..i..", index="..index)
---            print("#display_files="..#display_files)
-    end
-    return display_files
-end
-
--- returns multiline string
-function format_lines(playlist)
---    pl.print()
-    local display_files = {}
-    if pl.len <= settings.num_lines then
-        display_files = _short_list_display_lines(playlist)
-    else
-        display_files = _long_list_display_lines(playlist)
-    end
---    print("display_files:")
---    for i,v in pairs(display_files) do
---        print("display_files["..i.."] = "..v)
---    end
-    local output = display_files[1]
-    for i = 2, #display_files do
-        output = output.."\n"..display_files[i]
-    end
-    return output
-end
-
-
 -- entry point for playlist manager
 -- as well as general display
 function show_playlist(duration)
-    pl.update()
---    pl.print()
+    pl:print()
+    pl:update()
     if pl.len == 0 then
         return
     end
@@ -250,7 +127,7 @@ function show_playlist(duration)
 
     output = "Playing: "..mp.get_property('media-title').."\n\n"
     output = output.."Playlist - "..(pl.cursor+1).." / "..pl.len.."        [ESC to quit]\n"
-    output = output..format_lines(get_playlist())
+    output = output..pl:format_lines(pl:get_playlist())
     mp.osd_message(output, (tonumber(duration) or settings.osd_duration_seconds))
 end
 
@@ -271,18 +148,18 @@ end
 
 
 function scroll_up()
-    pl.increment()
+    pl:increment()
     show_playlist()
 end
 
 function scroll_down()
-    pl.decrement()
+    pl:decrement()
     show_playlist()
 end
 
 -- remove file from playlist - probably won't use
 function remove_file()
-    pl.update()
+    pl:update()
     if pl.len == 0 then return end
     mp.commandv("playlist-remove", pl.cursor)
     if pl.cursor==pl.len-1 then pl.cursor = pl.cursor - 1 end
@@ -298,26 +175,26 @@ end
 -- load file at cursor
 -- exits playlist manager
 function load_file()
-    pl.update()
-    if pl.len == 0 then return end
-    if pl.cursor < pl.pos then
-        for x=1,math.abs(pl.cursor-pl.pos),1 do
-            mp.commandv("playlist-prev", "weak")
-        end
-    elseif pl.cursor>pl.pos then
-        for x=1,math.abs(pl.cursor-pl.pos),1 do
-            mp.commandv("playlist-next", "weak")
-        end
-    else
-        if pl.cursor~=pl.len-1 then
-            pl.cursor = pl.cursor + 1
-        end
-        mp.commandv("playlist-next", "weak")
-    end
+    mp.commandv("playlist-play-index", pl.cursor)
     exit_playlist()
 end
 
-
+function print_mpv_playlist_props()
+    print("Playlist Properties:")
+    local playlist_props = {"playlist-pos", "playlist-current-pos",
+    "playlist-playing-pos", "playlist-count"}
+    for k, v in pairs(playlist_props) do
+        print(v, "=>", mp.get_property(v))
+    end
+    local count = mp.get_property_number("playlist-count")
+    print("Playlist sub properties:")
+    for i = 0, count-1 do
+        local file = "playlist/"..i.."/filename"
+        local id = "playlist/"..i.."/id"
+        print(file, " = ", mp.get_property(file))
+        print(id, " = ", mp.get_property(id))
+    end
+end
 -- keybindings
 
 -- these bindings are added when showing the playlist and removed after
@@ -333,6 +210,8 @@ function add_keybindings()
 
     mp.add_forced_key_binding('ESC', 'handle_exit_key', handle_exit_key)
     mp.add_forced_key_binding('/', 'enter_search_input_mode', search.enter_input_mode)
+    mp.add_forced_key_binding('p','print_mpv_playlist_props', print_mpv_playlist_props)
+
 end
 
 function remove_keybindings()
@@ -344,6 +223,7 @@ function remove_keybindings()
     mp.remove_key_binding('remove_file')
     mp.remove_key_binding('handle_exit_key')
     mp.remove_key_binding('enter_search_input_mode')
+    mp.remove_key_binding('print_mpv_playlist_props')
 end
 
 -- this is static
