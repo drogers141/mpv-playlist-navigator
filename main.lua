@@ -16,19 +16,22 @@
 
 
 --local utils = require('mp.utils')
-local search = require('search')
+local search = require('search_entry')
+
 local pl = require('playlist')
 
 local settings = {
     -- essentially infinity
     osd_duration_seconds = 600,
+}
 
-    --- in search mode you can be in one of two states
-    ---    inputting a search string
-    ---    showing the list of matching playlist entries
-    search_mode_input = 2,
-    search_mode_list = 1,
-    search_mode_off = 0
+local state = {
+    saved_cursor_pos = 0,
+    in_search_display = false,
+    -- like the playlist from mpv, this will be 0-based
+    -- rows are tuple {playlist-index, filename}
+    search_filtered_playlist = {},
+    search_term = "n/a"
 }
 
 function settings.print()
@@ -108,14 +111,20 @@ end
 
 
 -- entry point for playlist manager
--- as well as general display
+function start_playlist_navigator()
+    pl:init()
+    add_keybindings()
+    show_playlist()
+end
+
+
+-- main display
 function show_playlist(duration)
     pl:print()
     pl:update()
     if pl.len == 0 then
         return
     end
-    add_keybindings()
 
     if pl.active ~= true then
         pl.active = true
@@ -133,13 +142,23 @@ end
 
 -- exit from search mode or exit the playlist manager
 function handle_exit_key()
-    print("Exiting ..")
-    exit_playlist()
+    if state.in_search_display then
+        -- remove this one or the one in show_playlist
+        pl:update()
+        pl.cursor = state.saved_cursor_pos
+        state.saved_cursor_pos = 0
+        state.in_search_display = false
+        state.search_filtered_playlist = {}
+        state.search_term = "n/a"
+        show_playlist()
+    else
+        exit_playlist_navigator()
+    end
 end
 
--- exit the playlist manager
+-- exit the playlist navigator
 -- clear the current context
-function exit_playlist()
+function exit_playlist_navigator()
     mp.osd_message("")
     remove_keybindings()
     prop_mgr.reset_properties()
@@ -149,34 +168,90 @@ end
 
 function scroll_up()
     pl:increment()
-    show_playlist()
+    if state.in_search_display then
+        show_search_filtered_playlist()
+    else
+        show_playlist()
+    end
 end
 
 function scroll_down()
     pl:decrement()
+    if state.in_search_display then
+        show_search_filtered_playlist()
+    else
+        show_playlist()
+    end
+end
+
+-- remove file from playlist
+function remove_file()
+    if pl.len == 0 then return end
+    mp.commandv("playlist-remove", pl.cursor)
+    pl.cursor = pl.cursor - 1
+    if pl.cursor < 0 then pl.cursor = 0 end
+    -- reload playlist into playlist data structure
+    pl:init()
     show_playlist()
 end
 
--- remove file from playlist - probably won't use
-function remove_file()
-    pl:update()
-    if pl.len == 0 then return end
-    mp.commandv("playlist-remove", pl.cursor)
-    if pl.cursor==pl.len-1 then pl.cursor = pl.cursor - 1 end
-    showplaylist()
-end
-
--- enter key - ie load a file in general
--- or select a search term when entering input in search mode
 function handle_enter_key()
-    load_file()
+    if state.in_search_display then
+        -- calculate playlist index
+        playlist_index = state.search_filtered_playlist[pl.cursor][1]
+        load_file(playlist_index)
+    else
+        load_file(pl.cursor)
+    end
 end
 
--- load file at cursor
--- exits playlist manager
-function load_file()
-    mp.commandv("playlist-play-index", pl.cursor)
-    exit_playlist()
+function show_search_filtered_playlist(duration)
+    files_only_array = {}
+    -- need 0-based array for line formatting
+    for i=0, #state.search_filtered_playlist do
+        files_only_array[i] = state.search_filtered_playlist[i][2]
+    end
+    --for i, v in ipairs(state.search_filtered_playlist) do
+    --    files_only_array[#files_only_array] = v[2]
+    --    print("adding: ", v[2], " to array, i = ", i)
+    --end
+    output = "Files Matching: "..state.search_term.."\n"
+    output = output.."[Enter to load file, ESC to return to playlist]\n"
+    output = output..pl:format_lines(files_only_array).."\n"
+    mp.osd_message(output, (tonumber(duration) or settings.osd_duration_seconds))
+end
+
+function on_search_input_done()
+    state.in_search_display = true
+    -- set up iteration for search results
+    state.saved_cursor_pos = pl.cursor
+    -- this cursor is just for the ui formatting
+    -- the correct index will have to be found if a file is selected
+    pl.cursor = 0
+    -- prevents gui from showing a false "currently playing" marker
+    pl.pos = -1
+    state.search_filtered_playlist = pl:filtered_playlist(search.input_string)
+    pl.len = #state.search_filtered_playlist + 1
+    state.search_term = search.input_string
+    print("search term: ", search.input_string)
+    print("matches:")
+    for i=0, #state.search_filtered_playlist do
+        v = state.search_filtered_playlist[i]
+        print(v[1], " ", v[2])
+    end
+    search.input_string = ""
+    show_search_filtered_playlist()
+end
+
+function enter_search_input_mode()
+    search:enter_input_mode(on_search_input_done)
+end
+
+-- load file at playlist_index
+-- exits playlist navigator
+function load_file(playlist_index)
+    mp.commandv("playlist-play-index", playlist_index)
+    exit_playlist_navigator()
 end
 
 function print_mpv_playlist_props()
@@ -209,7 +284,7 @@ function add_keybindings()
     mp.add_forced_key_binding('BS', 'remove_file', remove_file)
 
     mp.add_forced_key_binding('ESC', 'handle_exit_key', handle_exit_key)
-    mp.add_forced_key_binding('/', 'enter_search_input_mode', search.enter_input_mode)
+    mp.add_forced_key_binding('/', 'enter_search_input_mode', enter_search_input_mode)
     mp.add_forced_key_binding('p','print_mpv_playlist_props', print_mpv_playlist_props)
 
 end
@@ -227,4 +302,4 @@ function remove_keybindings()
 end
 
 -- this is static
-mp.add_key_binding('SHIFT+ENTER', 'show_playlist', show_playlist)
+mp.add_key_binding('SHIFT+ENTER', 'start_playlist_navigator', start_playlist_navigator)
