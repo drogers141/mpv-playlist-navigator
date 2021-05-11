@@ -18,7 +18,7 @@ local settings = {
     cursor_str = ">"
 }
 
---
+-- this object is exported
 local playlist = {
     -- index in playlist of currently playing video
     -- assume this is updated before display, including scrolling
@@ -32,7 +32,7 @@ local playlist = {
     -- the actual playlist
     files = {}
 }
--- constructor
+-- constructor-ish
 function playlist:init()
     self:update()
     self.files = self:get_playlist()
@@ -59,10 +59,11 @@ function playlist:decrement()
 end
 
 function playlist:print()
-    print("playlist: pos="..self.pos..", len="..self.len..", cursor="..self.cursor)
+    print(string.format("playlist: pos=%s, len=%s, cursor=%s",
+            self.pos, self.len, self.cursor))
 end
 
--- get the actual playlist from mpv as an array
+-- get the actual playlist from mpv as an array - 0-based
 function playlist:get_playlist()
     local pl = {}
     for i=0, self.len-1, 1
@@ -100,7 +101,6 @@ function playlist:long_list_display_lines(_playlist)
     if settings.num_lines % 2 == 0 then
         first = first + 1
     end
-    --        print("first="..first..", first + settings.num_lines="..(first + settings.num_lines))
     local index = 0
     for i = first, first + settings.num_lines - 1 do
         if i < 0 then
@@ -117,16 +117,12 @@ function playlist:long_list_display_lines(_playlist)
         if index == self.cursor then
             display_files[#display_files] = settings.cursor_str..display_files[#display_files]
         end
-        --            print("i="..i..", index="..index)
-        --            print("#display_files="..#display_files)
     end
     return display_files
 end
 
 -- returns multiline string
 function playlist:format_lines(_playlist)
-    print("format_lines - pl:")
-    self:print()
     local display_files = {}
     if self.len <= settings.num_lines then
         display_files = self:short_list_display_lines(_playlist)

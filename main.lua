@@ -1,5 +1,5 @@
 -- OSD Playlist Navigator
--- see keybindings for behavior
+-- see keybindings at bottom for behavior
 
 -- Notes
 -- I had to upgrade libass to HEAD to pickup a fix for osd-back-color
@@ -14,10 +14,8 @@
 -- or can use the 'handle_exit_key' (ESC) to return to the regular playlist
 -- search playlist scrolls like regular playlist
 
-
 --local utils = require('mp.utils')
 local search = require('search_entry')
-
 local pl = require('playlist')
 
 local settings = {
@@ -25,24 +23,9 @@ local settings = {
     osd_duration_seconds = 600,
 }
 
-local state = {
-    saved_cursor_pos = 0,
-    in_search_display = false,
-    -- like the playlist from mpv, this will be 0-based
-    -- rows are tuple {playlist-index, filename}
-    search_filtered_playlist = {},
-    search_term = "n/a"
-}
-
-function settings.print()
-    print("Settings:")
-    for k,v in pairs(settings) do
-        print(k, "=>", v)
-    end
-end
-
 -- properties manager
 -- hold custom properties - save defaults
+-- invocations at bottom of file
 local prop_mgr = {
     properties = {
         osd_font_size = 35,
@@ -60,55 +43,20 @@ local prop_mgr = {
         osd_back_color = "#00FFFFFF"    --mp.get_property("osd-back-color")
     }
 }
-function prop_mgr.set_properties()
-    mp.set_property("osd-font-size", prop_mgr.properties.osd_font_size)
-    mp.set_property("osd-color", prop_mgr.properties.osd_color)
-    mp.set_property("osd-border-size", prop_mgr.properties.osd_border_size)
-    mp.set_property("osd-border-color", prop_mgr.properties.osd_border_color)
-    mp.set_property("osd-back-color", prop_mgr.properties.osd_back_color)
-end
-function prop_mgr.reset_properties()
-    mp.set_property("osd-font-size", prop_mgr.defaults.osd_font_size)
-    mp.set_property("osd-color", prop_mgr.defaults.osd_color)
-    mp.set_property("osd-border-size", prop_mgr.defaults.osd_border_size)
-    mp.set_property("osd-border-color", prop_mgr.defaults.osd_border_color)
-    mp.set_property("osd-back-color", prop_mgr.defaults.osd_back_color)
-end
-function prop_mgr.print_defaults()
-    print("Default Properties:")
-    for k,v in pairs(prop_mgr.defaults) do
-        print(k, "=>", v)
-    end
-end
-function prop_mgr.print_properties()
-    print("Set Properties:")
-    for k,v in pairs(prop_mgr.properties) do
-        print(k, "=>", v)
-    end
-end
 
--- not required - just of interest
-function print_osd_properties()
-    print("OSD Properties")
-    local osd_props = {"osd-width", "osd-height", "osd-par", "osd-sym-cc", "osd-ass-cc", "osd-bar", "osd-bar-align-x",
-    "osd-bar-align-y", "osd-bar-w", "osd-bar-h", "osd-font", "osd-font-size", "osd-color", "osd-border-color",
-    "osd-shadow-color", "osd-back-color", "osd-border-size", "osd-shadow-offset", "osd-spacing", "osd-margin-x",
-    "osd-margin-y", "osd-align-x", "osd-align-y", "osd-blur", "osd-bold", "osd-italic", "osd-justify",
-    "force-rgba-osd-rendering", "osd-level", "osd-duration", "osd-fractions", "osd-scale", "osd-scale-by-window",
-    "term-osd", "term-osd-bar", "term-osd-bar-chars", "osd-playing-msg", "osd-status-msg", "osd-msg1", "osd-msg2",
-    "osd-msg3", "video-osd", "osdlevel",
-    -- sub-text properties
-    "sub-text", "subfont-text-scale", "sub-text-font", "sub-text-font-size", "sub-text-color", "sub-text-border-color",
-    "sub-text-shadow-color", "sub-text-back-color", "sub-text-border-size", "sub-text-shadow-offset", "sub-text-spacing",
-    "sub-text-margin-x", "sub-text-margin-y", "sub-text-align-x", "sub-text-align-y", "sub-text-blur", "sub-text-bold",
-    "sub-text-italic"}
-    for k, v in pairs(osd_props) do
-        print(v, "=>", mp.get_property(v))
-    end
+local state = {
+    saved_cursor_pos = 0,
+    in_search_display = false,
+    -- like the playlist from mpv, this will be 0-based
+    -- rows are tuple {playlist-index, filename}
+    search_filtered_playlist = {},
+    search_term = "n/a"
+}
+function state:print()
+    print(string.format(
+            "saved_cursor_pos: %s, in_search_display: %s, #search_filtered_playlist: %s, search_term: %s",
+            self.saved_cursor_pos, self.in_search_display, #self.search_filtered_playlist, self.search_term))
 end
--- prints at invocation of mpv only
---print_osd_properties()
-
 
 -- entry point for playlist manager
 function start_playlist_navigator()
@@ -117,10 +65,11 @@ function start_playlist_navigator()
     show_playlist()
 end
 
-
 -- main display
 function show_playlist(duration)
-    pl:print()
+    -- debug
+    --pl:print()
+    --state:print()
     pl:update()
     if pl.len == 0 then
         return
@@ -129,9 +78,10 @@ function show_playlist(duration)
     if pl.active ~= true then
         pl.active = true
         pl.cursor = pl.pos
-        prop_mgr.print_defaults()
-        prop_mgr.print_properties()
-        prop_mgr.set_properties()
+        -- debug - show active properties
+        --prop_mgr.print_defaults()
+        --prop_mgr.print_properties()
+        --prop_mgr.set_properties()
     end
 
     output = "Playing: "..mp.get_property('media-title').."\n\n"
@@ -143,8 +93,6 @@ end
 -- exit from search mode or exit the playlist manager
 function handle_exit_key()
     if state.in_search_display then
-        -- remove this one or the one in show_playlist
-        pl:update()
         pl.cursor = state.saved_cursor_pos
         state.saved_cursor_pos = 0
         state.in_search_display = false
@@ -199,6 +147,7 @@ function handle_enter_key()
     if state.in_search_display then
         -- calculate playlist index
         playlist_index = state.search_filtered_playlist[pl.cursor][1]
+        state.in_search_display = false
         load_file(playlist_index)
     else
         load_file(pl.cursor)
@@ -211,10 +160,6 @@ function show_search_filtered_playlist(duration)
     for i=0, #state.search_filtered_playlist do
         files_only_array[i] = state.search_filtered_playlist[i][2]
     end
-    --for i, v in ipairs(state.search_filtered_playlist) do
-    --    files_only_array[#files_only_array] = v[2]
-    --    print("adding: ", v[2], " to array, i = ", i)
-    --end
     output = "Files Matching: "..state.search_term.."\n"
     output = output.."[Enter to load file, ESC to return to playlist]\n"
     output = output..pl:format_lines(files_only_array).."\n"
@@ -233,11 +178,11 @@ function on_search_input_done()
     state.search_filtered_playlist = pl:filtered_playlist(search.input_string)
     pl.len = #state.search_filtered_playlist + 1
     state.search_term = search.input_string
-    print("search term: ", search.input_string)
-    print("matches:")
+    --print("search term: ", search.input_string)
+    --print("matches:")
     for i=0, #state.search_filtered_playlist do
         v = state.search_filtered_playlist[i]
-        print(v[1], " ", v[2])
+        --print(v[1], " ", v[2])
     end
     search.input_string = ""
     show_search_filtered_playlist()
@@ -262,7 +207,7 @@ function print_mpv_playlist_props()
         print(v, "=>", mp.get_property(v))
     end
     local count = mp.get_property_number("playlist-count")
-    print("Playlist sub properties:")
+    print("Playlist subproperties:")
     for i = 0, count-1 do
         local file = "playlist/"..i.."/filename"
         local id = "playlist/"..i.."/id"
@@ -270,8 +215,10 @@ function print_mpv_playlist_props()
         print(id, " = ", mp.get_property(id))
     end
 end
--- keybindings
 
+----------------------------------- KEYBINDINGS ----------------------------------------
+
+-- dynamic
 -- these bindings are added when showing the playlist and removed after
 function add_keybindings()
     mp.add_forced_key_binding('UP', 'scroll_down', scroll_down, "repeatable")
@@ -285,7 +232,8 @@ function add_keybindings()
 
     mp.add_forced_key_binding('ESC', 'handle_exit_key', handle_exit_key)
     mp.add_forced_key_binding('/', 'enter_search_input_mode', enter_search_input_mode)
-    mp.add_forced_key_binding('p','print_mpv_playlist_props', print_mpv_playlist_props)
+    -- uncomment for debug
+    --mp.add_forced_key_binding('p','print_mpv_playlist_props', print_mpv_playlist_props)
 
 end
 
@@ -301,5 +249,59 @@ function remove_keybindings()
     mp.remove_key_binding('print_mpv_playlist_props')
 end
 
--- this is static
+-- static
+-- added to mpv when you install the script
 mp.add_key_binding('SHIFT+ENTER', 'start_playlist_navigator', start_playlist_navigator)
+
+
+----------------------------------- DISPLAY PROPERTIES ----------------------------------------
+
+function prop_mgr.set_properties()
+    mp.set_property("osd-font-size", prop_mgr.properties.osd_font_size)
+    mp.set_property("osd-color", prop_mgr.properties.osd_color)
+    mp.set_property("osd-border-size", prop_mgr.properties.osd_border_size)
+    mp.set_property("osd-border-color", prop_mgr.properties.osd_border_color)
+    mp.set_property("osd-back-color", prop_mgr.properties.osd_back_color)
+end
+function prop_mgr.reset_properties()
+    mp.set_property("osd-font-size", prop_mgr.defaults.osd_font_size)
+    mp.set_property("osd-color", prop_mgr.defaults.osd_color)
+    mp.set_property("osd-border-size", prop_mgr.defaults.osd_border_size)
+    mp.set_property("osd-border-color", prop_mgr.defaults.osd_border_color)
+    mp.set_property("osd-back-color", prop_mgr.defaults.osd_back_color)
+end
+function prop_mgr.print_defaults()
+    print("Default Properties:")
+    for k,v in pairs(prop_mgr.defaults) do
+        print(k, "=>", v)
+    end
+end
+function prop_mgr.print_properties()
+    print("Set Properties:")
+    for k,v in pairs(prop_mgr.properties) do
+        print(k, "=>", v)
+    end
+end
+
+-- not required - just of interest
+function print_osd_properties()
+    print("OSD Properties")
+    local osd_props = {"osd-width", "osd-height", "osd-par", "osd-sym-cc", "osd-ass-cc", "osd-bar", "osd-bar-align-x",
+                       "osd-bar-align-y", "osd-bar-w", "osd-bar-h", "osd-font", "osd-font-size", "osd-color", "osd-border-color",
+                       "osd-shadow-color", "osd-back-color", "osd-border-size", "osd-shadow-offset", "osd-spacing", "osd-margin-x",
+                       "osd-margin-y", "osd-align-x", "osd-align-y", "osd-blur", "osd-bold", "osd-italic", "osd-justify",
+                       "force-rgba-osd-rendering", "osd-level", "osd-duration", "osd-fractions", "osd-scale", "osd-scale-by-window",
+                       "term-osd", "term-osd-bar", "term-osd-bar-chars", "osd-playing-msg", "osd-status-msg", "osd-msg1", "osd-msg2",
+                       "osd-msg3", "video-osd", "osdlevel",
+        -- sub-text properties
+                       "sub-text", "subfont-text-scale", "sub-text-font", "sub-text-font-size", "sub-text-color", "sub-text-border-color",
+                       "sub-text-shadow-color", "sub-text-back-color", "sub-text-border-size", "sub-text-shadow-offset", "sub-text-spacing",
+                       "sub-text-margin-x", "sub-text-margin-y", "sub-text-align-x", "sub-text-align-y", "sub-text-blur", "sub-text-bold",
+                       "sub-text-italic"}
+    for k, v in pairs(osd_props) do
+        print(v, "=>", mp.get_property(v))
+    end
+end
+-- prints at invocation of mpv only (no keybinding needed)
+--print_osd_properties()
+
