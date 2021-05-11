@@ -32,7 +32,7 @@ local playlist = {
     -- the actual playlist
     files = {}
 }
--- constructor-ish
+
 function playlist:init()
     self:update()
     self.files = self:get_playlist()
@@ -47,7 +47,6 @@ end
 -- cursor movements
 
 function playlist:increment()
-    self:print()
     self.cursor = (self.cursor + 1) % self.len
 end
 

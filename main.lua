@@ -2,7 +2,6 @@
 -- see keybindings at bottom for behavior
 
 -- Notes
--- I had to upgrade libass to HEAD to pickup a fix for osd-back-color
 -- line sizing
 -- the font-size property of the osd scales to the osd resolution dynamically
 -- with a font-size of 35 and a 10 line display, all video sizes can generally
@@ -60,6 +59,7 @@ end
 
 -- entry point for playlist manager
 function start_playlist_navigator()
+    prop_mgr.set_properties()
     pl:init()
     add_keybindings()
     show_playlist()
@@ -85,7 +85,7 @@ function show_playlist(duration)
     end
 
     output = "Playing: "..mp.get_property('media-title').."\n\n"
-    output = output.."Playlist - "..(pl.cursor+1).." / "..pl.len.."        [ESC to quit]\n"
+    output = output.."Playlist - "..(pl.cursor+1).." / "..pl.len.."        [Enter to load, ESC to quit, / to search]\n"
     output = output..pl:format_lines(pl:get_playlist())
     mp.osd_message(output, (tonumber(duration) or settings.osd_duration_seconds))
 end
@@ -178,11 +178,8 @@ function on_search_input_done()
     state.search_filtered_playlist = pl:filtered_playlist(search.input_string)
     pl.len = #state.search_filtered_playlist + 1
     state.search_term = search.input_string
-    --print("search term: ", search.input_string)
-    --print("matches:")
     for i=0, #state.search_filtered_playlist do
         v = state.search_filtered_playlist[i]
-        --print(v[1], " ", v[2])
     end
     search.input_string = ""
     show_search_filtered_playlist()
