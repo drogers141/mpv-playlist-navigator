@@ -5,7 +5,7 @@ Lightweight MPV media player On Screen Display providing easy navigation over th
 
 | Key | Action | Notes |
 | --- | ------ | ----- |
-| <kbd>Shift+Enter</kbd> | Show the navigator OSD | The only static MPV keybinding |
+| <kbd>Shift</kbd> + <kbd>Enter</kbd> | Show the navigator OSD | The only static MPV keybinding |
 | <kbd>↓</kbd> | scroll down |
 | <kbd>k</kbd> | scroll down |
 | <kbd>↑</kbd> | scroll up |
