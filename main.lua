@@ -1,6 +1,14 @@
 -- OSD Playlist Navigator
 -- see keybindings at bottom for behavior
 
+-- ***********************
+-- ******* TODO **********
+-- ***********************
+-- make search fail gracefully
+-- currently a failed search will cause an error and leave the mpv player
+-- in a state where you can't go into search mode again
+-- *************************
+
 -- Notes
 -- line sizing
 -- the font-size property of the osd scales to the osd resolution dynamically
