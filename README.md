@@ -26,8 +26,8 @@ Lightweight MPV media player On Screen Display providing easy navigation over th
 ![Screenshot](https://drogers141.github.io/mpv-playlist-navigator/search-listing-2.jpg)
 
 Search is case-insensitive and uses [lua search patterns](https://www.lua.org/pil/20.2.html).
-For basics it is like regular expressions '.' matches any character, and '\*' is zero or more
-repetitions.  So '.\*' and substrings gets you pretty far.
+For basics it is like regular expressions '.' matches any character, and '*' is zero or more
+repetitions.  So '.*' and substrings gets you pretty far.
 
 ## Installation
 
